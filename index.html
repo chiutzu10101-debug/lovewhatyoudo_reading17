@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手指字，耳朵聽，嘴巴跟讀小幫手</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+    <style>
+        :root {
+            /* 多巴胺色系定義 */
+            --color-bg: #FFFBF0; 
+            --color-primary: #FF6B6B; 
+            --color-secondary: #4ECDC4; 
+            --color-accent: #FFE66D; 
+            --color-purple: #A29BFE; 
+            --color-text: #2D3436;
+            --color-highlight: #FFF700; 
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", "Heiti TC", sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #FF9F43;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 0px #fff;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            overflow: hidden;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .text-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            flex: 1;
+            padding: 20px;
+            font-size: 24px;
+            line-height: 1.8;
+            border: 3px solid #E0E0E0;
+            border-radius: 15px;
+            resize: none;
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.3s;
+            color: #555;
+            background-color: #FAFAFA;
+        }
+
+        textarea:focus {
+            border-color: var(--color-secondary);
+            background-color: #fff;
+        }
+
+        #read-display {
+            display: none;
+            width: 100%;
+            flex: 1;
+            padding: 20px;
+            font-size: 24px;
+            line-height: 2.0;
+            border: 3px solid var(--color-secondary);
+            border-radius: 15px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            background-color: #fff;
+            white-space: pre-wrap;
+            color: #ccc; 
+            cursor: pointer;
+            position: relative;
+        }
+        
+        #read-display:hover {
+            box-shadow: inset 0 0 10px rgba(78, 205, 196, 0.2);
+        }
+
+        .highlight-block {
+            background-color: var(--color-highlight);
+            color: #000;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(255, 247, 0, 0.5);
+            display: inline;
+        }
+
+        .file-upload {
+            font-size: 0.9rem;
+            color: #888;
+            text-align: right;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls-section {
+            flex: 1;
+            background-color: #fff;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 320px; /* 稍微加寬以容納更多按鍵 */
+            overflow-y: auto;
+        }
+
+        .control-group {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 15px;
+            border: 2px solid #eee;
+        }
+
+        .control-label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 12px;
+            color: #555;
+            font-size: 1.1rem;
+        }
+
+        /* 速度按鍵樣式調整為九宮格 */
+        .speed-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        button {
+            padding: 10px 5px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+            color: #555;
+            background-color: #eee;
+            box-shadow: 0 3px 0 #ddd;
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 0 0 #ddd;
+        }
+
+        button.active {
+            color: white;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+        }
+        
+        /* 顏色分級：慢速(綠) -> 中速(藍) -> 快速(紅) */
+        button[data-group="slow"].active { background-color: #A3CB38; } 
+        button[data-group="mid"].active { background-color: #1289A7; } 
+        button[data-group="fast"].active { background-color: #EE5A24; } 
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn-play { background-color: #FF6B6B; color: white; box-shadow: 0 4px 0 #d64545; padding: 15px; }
+        .btn-stop { background-color: #54a0ff; color: white; box-shadow: 0 4px 0 #2e75d4; padding: 15px; }
+        .btn-pause { background-color: #FFE66D; color: #555; box-shadow: 0 4px 0 #e6ce4d; padding: 15px; }
+        .btn-resume { background-color: #48dbfb; color: #555; box-shadow: 0 4px 0 #2bbad6; padding: 15px; }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid #ccc;
+            font-size: 16px;
+            background-color: white;
+        }
+
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: var(--color-primary);
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            body { height: auto; padding: 10px; }
+            .main-container { flex-direction: column-reverse; padding: 10px; }
+            .text-section { height: 50vh; }
+            .controls-section { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>✨ 手指字，耳朵聽，嘴巴跟讀小幫手 ✨</h1>
+    </header>
+
+    <div id="loading-overlay">📄 正在解析 PDF 文件，請稍候...</div>
+
+    <div class="main-container">
+        <div class="text-section">
+            <textarea id="text-input" placeholder="老師請在此貼上文章，或點擊下方按鈕上傳 PDF/TXT..."></textarea>
+            <div id="read-display" title="點擊任何文字即可從該處開始朗讀"></div>
+
+            <div class="file-upload">
+                <button onclick="document.getElementById('file-input').click()" style="background:none; border:2px dashed #ccc; box-shadow:none; color:#888; font-size: 0.9rem; padding: 5px; width: auto; cursor:pointer;">
+                    📂 上傳檔案 (支援 .txt 與 .pdf)
+                </button>
+                <span style="font-size: 0.8rem; color: #aaa;">提示：開始後，點擊文中任何字可跳轉</span>
+                <input type="file" id="file-input" accept=".txt, .pdf" style="display: none;">
+            </div>
+        </div>
+
+        <div class="controls-section">
+            
+            <div class="control-group">
+                <span class="control-label">🚀 跟讀速度 (1最慢-9最快)</span>
+                <div class="speed-buttons" id="speed-container"></div>
+                <div style="text-align:center; font-size:0.8rem; color:#888; margin-top:5px;">
+                    速度說明：<span id="speed-desc">等級 2 (0.04)</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">🗣️ 聲音選擇</span>
+                <select id="voice-select">
+                    <option>正在偵測語音...</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <span class="control-label">🎮 播放控制</span>
+                <div class="action-buttons">
+                    <button class="btn-play" onclick="startSpeaking(0)">▶ 開始</button>
+                    <button class="btn-stop" onclick="stopSpeaking()">⏹ 停止</button>
+                    <button class="btn-pause" onclick="pauseSpeaking()">⏸ 暫停</button>
+                    <button class="btn-resume" onclick="resumeSpeaking()">⏯ 繼續</button>
+                </div>
+                <div style="margin-top: 15px; font-size: 0.9rem; color: #666; text-align: center;">
+                    狀態：<span id="status">準備好了</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        const textInput = document.getElementById('text-input');
+        const readDisplay = document.getElementById('read-display');
+        const voiceSelect = document.getElementById('voice-select');
+        const speedContainer = document.getElementById('speed-container');
+        const speedDesc = document.getElementById('speed-desc');
+        const statusDisplay = document.getElementById('status');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        // V13: 全速域 (9段變速)
+        const speeds = [
+            { value: 0.02, label: "1", group: "slow", desc: "等級 1 (0.02) - 極慢速" },
+            { value: 0.04, label: "2", group: "slow", desc: "等級 2 (0.04) - 特慢速" },
+            { value: 0.08, label: "3", group: "slow", desc: "等級 3 (0.08) - 很慢速" },
+            
+            { value: 0.1,  label: "4", group: "mid",  desc: "等級 4 (0.10) - 慢速" },
+            { value: 0.2,  label: "5", group: "mid",  desc: "等級 5 (0.20) - 稍慢" },
+            { value: 0.4,  label: "6", group: "mid",  desc: "等級 6 (0.40) - 中慢" },
+            
+            { value: 0.8,  label: "7", group: "fast", desc: "等級 7 (0.80) - 接近正常" },
+            { value: 1.0,  label: "8", group: "fast", desc: "等級 8 (1.00) - 正常語速" },
+            { value: 1.2,  label: "9", group: "fast", desc: "等級 9 (1.20) - 稍快" }
+        ];
+
+        let currentRate = 0.04; 
+        let utterance = null;
+        let fullTextContent = ""; 
+
+        window.onload = function() {
+            initSpeedButtons();
+        };
+
+        readDisplay.addEventListener('click', function(e) {
+            const clickIndex = getCaretCharacterOffsetWithin(readDisplay);
+            if (clickIndex >= 0 && clickIndex < fullTextContent.length) {
+                if (synth.speaking) synth.cancel();
+                startSpeaking(clickIndex);
+            }
+        });
+
+        function getCaretCharacterOffsetWithin(element) {
+            let caretOffset = 0;
+            const doc = element.ownerDocument || element.document;
+            const win = doc.defaultView || doc.parentWindow;
+            let sel;
+            if (typeof win.getSelection != "undefined") {
+                sel = win.getSelection();
+                if (sel.rangeCount > 0) {
+                    const range = win.getSelection().getRangeAt(0);
+                    const preCaretRange = range.cloneRange();
+                    preCaretRange.selectNodeContents(element);
+                    preCaretRange.setEnd(range.endContainer, range.endOffset);
+                    caretOffset = preCaretRange.toString().length;
+                }
+            }
+            return caretOffset;
+        }
+
+        function renderHighlight(index) {
+            const { start, end } = getSentenceBounds(fullTextContent, index);
+            const pre = fullTextContent.substring(0, start);
+            const highlight = fullTextContent.substring(start, end);
+            const post = fullTextContent.substring(end);
+            
+            readDisplay.innerHTML = `${pre}<span class="highlight-block">${highlight}</span>${post}`;
+            
+            const highlightEl = document.querySelector('.highlight-block');
+            if (highlightEl) {
+                highlightEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
+        function initSpeedButtons() {
+            speedContainer.innerHTML = '';
+            speeds.forEach(speed => {
+                const btn = document.createElement('button');
+                btn.textContent = speed.label;
+                btn.dataset.level = speed.label;
+                btn.dataset.group = speed.group; // 用於顏色分組
+                btn.onclick = () => setSpeed(speed.value, speed.desc, btn);
+                if (speed.value === currentRate) {
+                    btn.classList.add('active');
+                    speedDesc.textContent = speed.desc;
+                }
+                speedContainer.appendChild(btn);
+            });
+        }
+
+        function setSpeed(rate, desc, btnElement) {
+            currentRate = rate;
+            speedDesc.textContent = desc;
+            document.querySelectorAll('.speed-buttons button').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+        }
+
+        function loadVoices() {
+            let allVoices = synth.getVoices();
+            let twVoices = allVoices.filter(v => v.lang.includes('zh-TW'));
+            if (twVoices.length === 0) {
+                twVoices = allVoices.filter(v => v.lang.includes('zh'));
+            }
+
+            let maleVoice = twVoices.find(v => 
+                v.name.includes('Male') || v.name.includes('Zhiwei') || v.name.includes('Danny')
+            );
+
+            let femaleVoice = twVoices.find(v => 
+                v.name.includes('Female') || v.name.includes('Yating') || v.name.includes('Hanhan') || v.name.includes('Meijia') || v.name.includes('Google')
+            );
+            
+            if (!femaleVoice && twVoices.length > 0) {
+                femaleVoice = twVoices[0];
+            }
+
+            voiceSelect.innerHTML = '';
+            
+            if (femaleVoice) {
+                const opt = document.createElement('option');
+                opt.value = femaleVoice.name;
+                opt.textContent = "👩 女聲 (台灣口音)";
+                opt.selected = true; 
+                voiceSelect.appendChild(opt);
+            }
+
+            if (maleVoice) {
+                const opt = document.createElement('option');
+                opt.value = maleVoice.name;
+                opt.textContent = "👨 男聲 (台灣口音)";
+                voiceSelect.appendChild(opt);
+            }
+
+            if (voiceSelect.options.length === 0) {
+                const opt = document.createElement('option');
+                opt.textContent = "⚠️ 找不到台灣語音包";
+                voiceSelect.appendChild(opt);
+            }
+        }
+
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        function getSentenceBounds(text, index) {
+            if (index < 0) index = 0;
+            if (index >= text.length) index = text.length - 1;
+            let start = index;
+            while (start > 0 && !isPunctuation(text[start - 1])) { start--; }
+            let end = index;
+            while (end < text.length && !isPunctuation(text[end])) { end++; }
+            if (end < text.length) end++; 
+            return { start, end };
+        }
+
+        function isPunctuation(char) {
+            return /[，。！？；：,.\!?;:\n\r\t]/.test(char);
+        }
+
+        function startSpeaking(startIndex = 0) {
+            const text = textInput.value.trim();
+            if (!text) return;
+            fullTextContent = text;
+            textInput.style.display = 'none';
+            readDisplay.style.display = 'block';
+            renderHighlight(startIndex);
+
+            const textToSpeak = text.substring(startIndex);
+            utterance = new SpeechSynthesisUtterance(textToSpeak);
+            const selectedOption = voiceSelect.value;
+            const voices = synth.getVoices();
+            const voice = voices.find(v => v.name === selectedOption);
+            if (voice) utterance.voice = voice;
+            utterance.rate = currentRate;
+
+            utterance.onboundary = (event) => {
+                const currentGlobalIndex = startIndex + event.charIndex;
+                renderHighlight(currentGlobalIndex);
+            };
+
+            utterance.onend = () => { statusDisplay.textContent = "朗讀結束"; };
+            utterance.onerror = (e) => { 
+                console.error(e); 
+                statusDisplay.textContent = "發生錯誤或停止"; 
+            };
+            statusDisplay.textContent = "▶️ 正在朗讀...";
+            synth.cancel(); 
+            setTimeout(() => { synth.speak(utterance); }, 10);
+        }
+
+        function stopSpeaking() {
+            synth.cancel();
+            statusDisplay.textContent = "⏹ 已停止";
+            switchToEditMode();
+        }
+
+        function switchToEditMode() {
+            textInput.style.display = 'block';
+            readDisplay.style.display = 'none';
+            readDisplay.innerHTML = '';
+        }
+
+        function pauseSpeaking() {
+            if (synth.speaking && !synth.paused) { synth.pause(); statusDisplay.textContent = "⏸ 已暫停"; }
+        }
+        function resumeSpeaking() {
+            if (synth.paused) { synth.resume(); statusDisplay.textContent = "▶️ 繼續朗讀"; }
+        }
+
+        document.getElementById('file-input').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type === 'text/plain') {
+                const reader = new FileReader();
+                reader.onload = function(e) { textInput.value = e.target.result; };
+                reader.readAsText(file);
+            } else if (file.type === 'application/pdf') {
+                loadingOverlay.style.display = 'flex'; 
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    let fullText = "";
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        const pageText = textContent.items.map(item => item.str).join(' ');
+                        fullText += pageText + "\n\n";
+                    }
+
+                    textInput.value = fullText;
+                    statusDisplay.textContent = "PDF 解析完成！";
+
+                } catch (error) {
+                    console.error("PDF Read Error:", error);
+                    alert("抱歉，無法讀取這個 PDF 檔。請確認它不是純圖片掃描檔喔！");
+                } finally {
+                    loadingOverlay.style.display = 'none'; 
+                }
+            } else {
+                alert("目前只支援 .txt 和 .pdf 檔案喔！");
+            }
+        });
+    </script>
+</body>
+</html>
